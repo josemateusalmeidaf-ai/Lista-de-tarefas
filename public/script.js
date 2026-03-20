@@ -1,6 +1,22 @@
+// Supabase Initialization
+const supabaseUrl = 'https://styyowwhpmizpktkoptw.supabase.co';
+const supabaseKey = 'sb_publishable_XCllAJL_RAxakFUrLrpOcA_0rOvUnqd';
+const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
 const API_URL = '/api/tasks';
 
 // DOM Elements
+const authContainer = document.getElementById('authContainer');
+const appContainer = document.getElementById('appContainer');
+const authForm = document.getElementById('authForm');
+const emailInput = document.getElementById('emailInput');
+const passwordInput = document.getElementById('passwordInput');
+const authSubmitBtn = document.getElementById('authSubmitBtn');
+const toggleAuthMode = document.getElementById('toggleAuthMode');
+const authMessage = document.getElementById('authMessage');
+const authSubtitle = document.getElementById('authSubtitle');
+const logoutBtn = document.getElementById('logoutBtn');
+
 const taskInput = document.getElementById('taskInput');
 const addBtn = document.getElementById('addBtn');
 const taskList = document.getElementById('taskList');
@@ -10,15 +26,109 @@ const filterBtns = document.querySelectorAll('.filter-btn');
 // State
 let tasks = [];
 let currentFilter = 'all';
+let isLoginMode = true;
+let session = null;
 
 // Initialize
 async function init() {
-    await fetchTasks();
+    // Check for existing session
+    const { data: { session: existingSession } } = await supabase.auth.getSession();
+    
+    if (existingSession) {
+        session = existingSession;
+        showApp();
+    } else {
+        showAuth();
+    }
+    
     setupEventListeners();
+}
+
+function showAuth() {
+    authContainer.style.display = 'block';
+    appContainer.style.display = 'none';
+    emailInput.value = '';
+    passwordInput.value = '';
+    authMessage.textContent = '';
+}
+
+async function showApp() {
+    authContainer.style.display = 'none';
+    appContainer.style.display = 'block';
+    await fetchTasks();
 }
 
 // Event Listeners
 function setupEventListeners() {
+    // Auth events
+    toggleAuthMode.addEventListener('click', (e) => {
+        e.preventDefault();
+        isLoginMode = !isLoginMode;
+        
+        if (isLoginMode) {
+            authSubtitle.textContent = 'Login to manage your tasks';
+            authSubmitBtn.textContent = 'Login';
+            toggleAuthMode.textContent = 'Sign Up (Cadastro)';
+        } else {
+            authSubtitle.textContent = 'Create an account to start';
+            authSubmitBtn.textContent = 'Sign Up (Cadastro)';
+            toggleAuthMode.textContent = 'Back to Login';
+        }
+        authMessage.textContent = '';
+    });
+
+    authForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = emailInput.value.trim();
+        const password = passwordInput.value.trim();
+        
+        authSubmitBtn.disabled = true;
+        authMessage.textContent = '';
+        authMessage.style.color = '#ef4444'; // Red for errors
+
+        try {
+            if (isLoginMode) {
+                // Login
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+                session = data.session;
+                showApp();
+            } else {
+                // Sign Up (Cadastro)
+                const { data, error } = await supabase.auth.signUp({ email, password });
+                if (error) throw error;
+                
+                // If email confirmation is required, session might be null
+                if (data.session) {
+                    session = data.session;
+                    showApp();
+                } else {
+                    isLoginMode = true;
+                    // Manually switch UI to login without triggering the click event that clears the message
+                    authSubtitle.textContent = 'Login to manage your tasks';
+                    authSubmitBtn.textContent = 'Login';
+                    toggleAuthMode.textContent = 'Sign Up (Cadastro)';
+                    
+                    authMessage.style.color = '#10b981'; // Green for success
+                    authMessage.textContent = 'Cadastro realizado! Por favor, confirme seu email ou faça login com sua senha.';
+                }
+            }
+        } catch (error) {
+            console.error('Auth error:', error);
+            authMessage.style.color = '#ef4444';
+            authMessage.textContent = 'Erro: ' + error.message;
+        } finally {
+            authSubmitBtn.disabled = false;
+        }
+    });
+
+    logoutBtn.addEventListener('click', async () => {
+        await supabase.auth.signOut();
+        session = null;
+        showAuth();
+    });
+
+    // Task events
     addBtn.addEventListener('click', addTask);
     
     taskInput.addEventListener('keypress', (e) => {
@@ -42,8 +152,13 @@ function setupEventListeners() {
 
 // Fetch tasks from API
 async function fetchTasks() {
+    if (!session) return;
     try {
-        const response = await fetch(API_URL);
+        const response = await fetch(API_URL, {
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`
+            }
+        });
         if (!response.ok) throw new Error('Failed to fetch tasks');
         
         const data = await response.json();
@@ -68,7 +183,8 @@ async function addTask() {
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
             },
             body: JSON.stringify({ task: taskText })
         });
@@ -115,7 +231,8 @@ async function toggleTask(id, currentStatus) {
         const response = await fetch(`${API_URL}/${id}`, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
             },
             body: JSON.stringify({ status: newStatus })
         });
@@ -143,7 +260,10 @@ async function deleteTask(id) {
 
     try {
         const response = await fetch(`${API_URL}/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`
+            }
         });
 
         if (!response.ok) {

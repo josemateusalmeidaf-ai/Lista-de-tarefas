@@ -16,6 +16,27 @@ const supabaseUrl = 'https://styyowwhpmizpktkoptw.supabase.co';
 const supabaseKey = 'sb_publishable_XCllAJL_RAxakFUrLrpOcA_0rOvUnqd';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Auth Middleware
+app.use(async (req, res, next) => {
+    if (!req.path.startsWith('/api/')) return next();
+    
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Unauthorized: Missing or invalid token' });
+    }
+    
+    const token = authHeader.split(' ')[1];
+    
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+    }
+    
+    req.user = user;
+    next();
+});
+
 // API Routes
 
 // 1. Get all tasks
@@ -23,6 +44,7 @@ app.get('/api/tasks', async (req, res) => {
     const { data, error } = await supabase
         .from('tasks')
         .select('*')
+        .eq('user_id', req.user.id)
         .order('id', { ascending: false });
         
     if (error) {
@@ -40,7 +62,7 @@ app.post('/api/tasks', async (req, res) => {
     
     const { data, error } = await supabase
         .from('tasks')
-        .insert([{ task, status: 'pending' }])
+        .insert([{ task, status: 'pending', user_id: req.user.id }])
         .select();
         
     if (error) {
@@ -64,6 +86,7 @@ app.put('/api/tasks/:id', async (req, res) => {
         .from('tasks')
         .update({ status })
         .eq('id', id)
+        .eq('user_id', req.user.id)
         .select();
 
     if (error) {
@@ -83,6 +106,7 @@ app.delete('/api/tasks/:id', async (req, res) => {
         .from('tasks')
         .delete()
         .eq('id', id)
+        .eq('user_id', req.user.id)
         .select();
 
     if (error) {

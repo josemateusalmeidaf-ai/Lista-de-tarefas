@@ -7,15 +7,43 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <div class="blob blob-1"></div>
     <div class="blob blob-2"></div>
 
-    <div class="container glass-panel">
+    <!-- Auth Container -->
+    <div class="container glass-panel" id="authContainer">
         <header>
             <h1>TaskMaster</h1>
-            <p>Manage your daily goals</p>
+            <p id="authSubtitle">Login to manage your tasks</p>
+        </header>
+
+        <form id="authForm" class="auth-form">
+            <div class="input-group-auth">
+                <input type="email" id="emailInput" placeholder="Email" required autocomplete="email">
+            </div>
+            <div class="input-group-auth">
+                <input type="password" id="passwordInput" placeholder="Password" required autocomplete="current-password">
+            </div>
+            <button type="submit" id="authSubmitBtn" class="primary-btn">Login</button>
+        </form>
+
+        <div class="auth-switch">
+            <p>Don't have an account? <a href="#" id="toggleAuthMode">Sign Up (Cadastro)</a></p>
+        </div>
+        <div id="authMessage" class="auth-message"></div>
+    </div>
+
+    <!-- App Container -->
+    <div class="container glass-panel" id="appContainer" style="display: none;">
+        <header class="app-header">
+            <div>
+                <h1>TaskMaster</h1>
+                <p>Manage your daily goals</p>
+            </div>
+            <button id="logoutBtn" class="logout-btn" title="Logout"><i class="fas fa-sign-out-alt"></i></button>
         </header>
 
         <div class="input-group">
