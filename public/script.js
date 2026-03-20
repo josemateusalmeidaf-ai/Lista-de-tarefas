@@ -1,7 +1,12 @@
 // Supabase Initialization
 const supabaseUrl = 'https://styyowwhpmizpktkoptw.supabase.co';
 const supabaseKey = 'sb_publishable_XCllAJL_RAxakFUrLrpOcA_0rOvUnqd';
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+// Protect against CDN not being loaded (Cached index.html)
+let supabaseClient;
+if (window.supabase) {
+    supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+}
 
 const API_URL = '/api/tasks';
 
@@ -31,14 +36,25 @@ let session = null;
 
 // Initialize
 async function init() {
-    // Check for existing session
-    const { data: { session: existingSession } } = await supabase.auth.getSession();
-    
-    if (existingSession) {
-        session = existingSession;
-        showApp();
-    } else {
+    try {
+        if (!supabaseClient) {
+            throw new Error("Supabase não carregou. Por favor, dê um Ctrl+F5 para atualizar a página completamente e limpar o cache.");
+        }
+        
+        // Check for existing session
+        const { data: { session: existingSession } } = await supabaseClient.auth.getSession();
+        
+        if (existingSession) {
+            session = existingSession;
+            showApp();
+        } else {
+            showAuth();
+        }
+    } catch (error) {
+        console.error("Initialization error:", error);
         showAuth();
+        authMessage.style.color = '#ef4444';
+        authMessage.textContent = error.message;
     }
     
     setupEventListeners();
@@ -89,13 +105,13 @@ function setupEventListeners() {
         try {
             if (isLoginMode) {
                 // Login
-                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
                 if (error) throw error;
                 session = data.session;
                 showApp();
             } else {
                 // Sign Up (Cadastro)
-                const { data, error } = await supabase.auth.signUp({ email, password });
+                const { data, error } = await supabaseClient.auth.signUp({ email, password });
                 if (error) throw error;
                 
                 // If email confirmation is required, session might be null
@@ -123,7 +139,7 @@ function setupEventListeners() {
     });
 
     logoutBtn.addEventListener('click', async () => {
-        await supabase.auth.signOut();
+        await supabaseClient.auth.signOut();
         session = null;
         showAuth();
     });

@@ -33,6 +33,15 @@ app.use(async (req, res, next) => {
         return res.status(401).json({ error: 'Unauthorized: Invalid token' });
     }
     
+    // Create a request-specific Supabase client with the user's token
+    req.supabase = createClient(supabaseUrl, supabaseKey, {
+        global: {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        }
+    });
+
     req.user = user;
     next();
 });
@@ -41,7 +50,7 @@ app.use(async (req, res, next) => {
 
 // 1. Get all tasks
 app.get('/api/tasks', async (req, res) => {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
         .from('tasks')
         .select('*')
         .eq('user_id', req.user.id)
@@ -60,7 +69,7 @@ app.post('/api/tasks', async (req, res) => {
         return res.status(400).json({ error: 'Task content is required' });
     }
     
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
         .from('tasks')
         .insert([{ task, status: 'pending', user_id: req.user.id }])
         .select();
@@ -82,7 +91,7 @@ app.put('/api/tasks/:id', async (req, res) => {
         return res.status(400).json({ error: 'Invalid status' });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
         .from('tasks')
         .update({ status })
         .eq('id', id)
@@ -102,7 +111,7 @@ app.put('/api/tasks/:id', async (req, res) => {
 app.delete('/api/tasks/:id', async (req, res) => {
     const { id } = req.params;
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
         .from('tasks')
         .delete()
         .eq('id', id)
